@@ -115,4 +115,47 @@ export default function App() {
     {dialog?.type === 'export' && <ExportDialog config={config} corpus={ corpora.find(corpus => !corpus.demo)} onClose={closeDialog} onExported={notify}/>}
     {dialog?.type === 'search' && <SearchDialog corpora={corpora} onClose={closeDialog} onNavigate={navigate} onSelect={corpus => setDialog({ type: 'corpus', corpus })}/>}
     {dialog?.type === 'confirm' && <ConfirmDialog title={dialog.title} description={dialog.description} action={dialog.action} onClose={closeDialog} onConfirm={dialog.confirm}/>}
-    {dialog?.type === 'weights' &
+    {dialog?.type === 'weights' && (
+      <div className="modal-backdrop" role="presentation">
+        <section className="modal" role="dialog" aria-modal="true" aria-labelledby="weights-title">
+          <div className="modal-header">
+            <h2 id="weights-title">Répartition des piliers NXS</h2>
+            <button className="icon-button" onClick={closeDialog} aria-label="Fermer">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="modal-body">
+            {['Méta-Code & Forge', 'Cyber-Ingénierie', 'Vision & Vidéo', 'Orchestration MCP', 'Logique & Mathématiques'].map((name, index) => (
+              <label key={name} className="weight-field">
+                <span>{name}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={weights[index] ?? 0}
+                  onChange={event => {
+                    const value = Math.max(0, Math.min(100, Number(event.target.value)));
+                    setWeights(previous => previous.map((weight, i) => i === index ? value : weight));
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="modal-footer">
+            <button className="button button-outline" onClick={() => setWeights(DEFAULT_WEIGHTS)}>
+              Réinitialiser
+            </button>
+            <button className="button button-primary" onClick={closeDialog}>
+              Enregistrer
+            </button>
+          </div>
+        </section>
+      </div>
+    )}
+
+    {toast && <Toast message={toast} onClose={closeToast} />}
+  </div>;
+}
+
