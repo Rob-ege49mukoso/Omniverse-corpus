@@ -1,6 +1,6 @@
 
-
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   X, Search, Upload, Download, FilePlus2, Trash2,
   Play, CheckCircle2, AlertCircle, Database
@@ -60,7 +60,7 @@ function DialogShell({
   onClose
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   onClose: () => void;
 }) {
   return (
