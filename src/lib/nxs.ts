@@ -333,32 +333,7 @@ export function compileNxs(options: CompileOptions): Uint8Array {
   return result;
     }
 
-    const segments: Segment[] = [];
-    let cursor = 2;
-    let start = cursor;
-
-    while (cursor < length - 2) {
-      if (bytes[cursor] !== 255) { cursor++; continue; }
-      if (bytes[cursor + 1] === 255) { cursor += 2; continue; }
-
-      const type = bytes[cursor + 1];
-      if (type === 0 || type === 254) throw new Error('Marqueur de contrôle dans la charge utile.');
-      if (type < 1 || type > 5) throw new Error('Type de segment inconnu.');
-
-      segments.push({ type: TOKENS[type - 1].type, data: unescape(bytes.slice(start, cursor)) });
-      cursor += 2;
-      start = cursor;
-    }
-
-    if (start > length - 2) throw new Error('Charge utile tronquée.');
-    segments.push({ type: 'think', data: unescape(bytes.slice(start, length - 2)) });
-    result.push({ bytes, segments });
-  }
-
-  return result;
-}
-
-function unescape(data: Uint8Array): Uint8Array {
+  function unescape(data: Uint8Array): Uint8Array {
   const result = new Uint8Array(data.length);
   let offset = 0;
 
