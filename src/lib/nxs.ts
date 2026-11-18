@@ -185,39 +185,90 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
    }
    
 export function compileNxs(options: CompileOptions): Uint8Array {
-  const total = Math.max(4, Math.min(4000, Math.round(options.multiplier * 4)));
-  const kinds: Modality[] = ['forge', 'cyber', 'vision', 'mcp', 'think'];
-  const sum = options.weights.reduce((a, b) => a + b, 0) || 100;
-  const counts = options.weights.map(weight => Math.floor(total * weight / sum));
+  const total = Math.max(
+    4,
+    Math.min(4000, Math.round(options.multiplier * 4))
+  );
+
+  const kinds: Modality[] = [
+    'forge',
+    'cyber',
+    'vision',
+    'mcp',
+    'think'
+  ];
+
+  const sum =
+    options.weights.reduce((a, b) => a + b, 0) || 100;
+
+  const counts = options.weights.map(
+    weight => Math.floor(total * weight / sum)
+  );
+
   let remainder = total - counts.reduce((a, b) => a + b, 0);
 
-  for (let i = 0; remainder > 0; i = (i + 1) % counts.length, remainder--) counts[i]++;
+  for (
+    let i = 0;
+    remainder > 0;
+    i = (i + 1) % counts.length, remainder--
+  ) {
+    counts[i]++;
+  }
+
+  const sequenceLength = Math.max(
+    1,
+    Math.floor(options.sequenceLength)
+  );
 
   const sequences: Uint8Array[] = [];
+
   counts.forEach((count, index) => {
-    for (let i = 0; i < count; i++) sequences.push(buildSequence(kinds[index], i));
+    for (let i = 0; i < count; i++) {
+      const sequence = buildSequence(
+        kinds[index],
+        i,
+        options.name
+      );
+
+      sequences.push(
+        limitSequence(sequence, sequenceLength)
+      );
+    }
   });
 
   let seed = 42;
+
   for (let i = sequences.length - 1; i > 0; i--) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     const j = seed % (i + 1);
-    [sequences[i], sequences[j]] = [sequences[j], sequences[i]];
+
+    [sequences[i], sequences[j]] = [
+      sequences[j],
+      sequences[i]
+    ];
   }
 
-  const size = sequences.reduce((totalBytes, sequence) => totalBytes + sequence.length + 4, 0);
+  const size = sequences.reduce(
+    (totalBytes, sequence) =>
+      totalBytes + sequence.length + 4,
+    0
+  );
+
   const output = new Uint8Array(size);
   const view = new DataView(output.buffer);
   let offset = 0;
 
   for (const sequence of sequences) {
-    view.setUint32(offset, sequence.length, true); offset += 4;
-    output.set(sequence, offset); offset += sequence.length;
+    view.setUint32(offset, sequence.length, true);
+    offset += 4;
+
+    output.set(sequence, offset);
+    offset += sequence.length;
   }
 
   return output;
-}
-
+      }
+   
 export function parseNxs(data: Uint8Array): ParsedSequence[] {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const result: ParsedSequence[] = [];
