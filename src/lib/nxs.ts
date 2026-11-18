@@ -247,29 +247,8 @@ export function compileNxs(options: CompileOptions): Uint8Array {
       sequences[i]
     ];
   }
-
-  const size = sequences.reduce(
-    (totalBytes, sequence) =>
-      totalBytes + sequence.length + 4,
-    0
-  );
-
-  const output = new Uint8Array(size);
-  const view = new DataView(output.buffer);
-  let offset = 0;
-
-  for (const sequence of sequences) {
-    view.setUint32(offset, sequence.length, true);
-    offset += 4;
-
-    output.set(sequence, offset);
-    offset += sequence.length;
-  }
-
-  return output;
-      }
-   
-export function parseNxs(data: Uint8Array): ParsedSequence[] {
+  
+   export function parseNxs(data: Uint8Array): ParsedSequence[] {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const result: ParsedSequence[] = [];
   let offset = 0;
