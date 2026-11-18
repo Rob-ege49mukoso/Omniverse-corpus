@@ -352,7 +352,6 @@ export function compileNxs(options: CompileOptions): Uint8Array {
   }
 
   return result;
-    }
 
   function unescape(data: Uint8Array): Uint8Array {
   const result = new Uint8Array(data.length);
