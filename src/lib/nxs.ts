@@ -70,8 +70,11 @@ const concat = (...arrays: Uint8Array[]) => {
   return result;
 };
 
-export function buildSequence(kind: Modality, variant = 0): Uint8Array {
-  let payload: Uint8Array;
+ export function buildSequence(
+  kind: Modality,
+  variant = 0,
+  corpusName = ''
+): Uint8Array {
 
   if (kind === 'think') {
     payload = text(variant % 2
@@ -104,8 +107,17 @@ export function buildSequence(kind: Modality, variant = 0): Uint8Array {
 
   const type = kind === 'math' ? 'think' : kind;
   const byte = TOKENS.find(token => token.type === type)!.byte;
-  return concat(marker(254), escapePayload(text('OBJECTIF: Construire un corpus multimodal cohérent.\n')), marker(byte), escapePayload(payload), marker(0));
-}
+  const metadata =
+  'OBJECTIF: Construire un corpus multimodal cohérent.\n' +
+  (corpusName ? `CORPUS: ${corpusName}\n` : '');
+
+return concat(
+  marker(254),
+  escapePayload(text(metadata)),
+  marker(byte),
+  escapePayload(payload),
+  marker(0)
+);
 
 export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Array {
   const byte = type === 'math' ? 1 : TOKENS.find(token => token.type === type)!.byte;
