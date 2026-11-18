@@ -124,6 +124,66 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
   return concat(marker(254), escapePayload(text('SOURCE: Fichier local importé. Données inertes, sans exécution.')), marker(byte), escapePayload(payload), marker(0));
 }
 
+   function limitSequence(
+  sequence: Uint8Array,
+  maxPayloadBytes: number
+): Uint8Array {
+  const limit = Math.max(1, Math.floor(maxPayloadBytes));
+
+  let markerIndex = -1;
+
+  for (let i = 2; i < sequence.length - 2; i++) {
+    if (sequence[i] !== 255) continue;
+
+    if (
+      i + 1 < sequence.length - 2 &&
+      sequence[i + 1] === 255
+    ) {
+      i++;
+      continue;
+    }
+
+    if (
+      i + 1 < sequence.length - 2 &&
+      sequence[i + 1] >= 1 &&
+      sequence[i + 1] <= 5
+    ) {
+      markerIndex = i;
+      break;
+    }
+  }
+
+  if (markerIndex === -1) {
+    throw new Error('Marqueur de modalité introuvable.');
+  }
+
+  const payloadStart = markerIndex + 2;
+  let cursor = payloadStart;
+  let decodedBytes = 0;
+
+  while (
+    cursor < sequence.length - 2 &&
+    decodedBytes < limit
+  ) {
+    if (
+      sequence[cursor] === 255 &&
+      sequence[cursor + 1] === 255
+    ) {
+      cursor += 2;
+    } else {
+      cursor++;
+    }
+
+    decodedBytes++;
+  }
+
+  return concat(
+    sequence.slice(0, payloadStart),
+    sequence.slice(payloadStart, cursor),
+    marker(0)
+  );
+   }
+   
 export function compileNxs(options: CompileOptions): Uint8Array {
   const total = Math.max(4, Math.min(4000, Math.round(options.multiplier * 4)));
   const kinds: Modality[] = ['forge', 'cyber', 'vision', 'mcp', 'think'];
@@ -164,15 +224,83 @@ export function parseNxs(data: Uint8Array): ParsedSequence[] {
   let offset = 0;
 
   while (offset < data.length) {
-    if (offset + 4 > data.length) throw new Error('En-tête de séquence tronqué.');
+    if (offset + 4 > data.length) {
+      throw new Error('En-tête de séquence tronqué.');
+    }
 
-    const length = view.getUint32(offset, true); offset += 4;
-    if (length > data.length - offset) throw new Error('Longueur de séquence invalide.');
+    const length = view.getUint32(offset, true);
+    offset += 4;
 
-    const bytes = data.slice(offset, offset + length); offset += length;
+    if (length < 4 || length > data.length - offset) {
+      throw new Error('Longueur de séquence invalide.');
+    }
 
-    if (length < 4 || bytes[0] !== 255 || bytes[1] !== 254 || bytes[length - 2] !== 255 || bytes[length - 1] !== 0) {
+    const bytes = data.slice(offset, offset + length);
+    offset += length;
+
+    if (
+      bytes[0] !== 255 ||
+      bytes[1] !== 254 ||
+      bytes[length - 2] !== 255 ||
+      bytes[length - 1] !== 0
+    ) {
       throw new Error('Séquence sans début BOS ou fin EOS.');
+    }
+
+    const segments: Segment[] = [];
+    let cursor = 2;
+    let start = 2;
+    let activeType: Modality | null = null;
+
+    while (cursor < length - 2) {
+      if (bytes[cursor] !== 255) {
+        cursor++;
+        continue;
+      }
+
+      if (
+        cursor + 1 < length - 2 &&
+        bytes[cursor + 1] === 255
+      ) {
+        cursor += 2;
+        continue;
+      }
+
+      if (cursor + 1 >= length - 2) {
+        throw new Error('Marqueur de segment tronqué.');
+      }
+
+      const type = bytes[cursor + 1];
+
+      if (type < 1 || type > 5) {
+        throw new Error('Type de segment inconnu.');
+      }
+
+      if (activeType !== null) {
+        segments.push({
+          type: activeType,
+          data: unescape(bytes.slice(start, cursor))
+        });
+      }
+
+      activeType = TOKENS[type - 1].type;
+      cursor += 2;
+      start = cursor;
+    }
+
+    if (activeType === null) {
+      throw new Error('Aucun segment de données trouvé.');
+    }
+
+    segments.push({
+      type: activeType,
+      data: unescape(bytes.slice(start, length - 2))
+    });
+
+    result.push({ bytes, segments });
+  }
+
+  return result;
     }
 
     const segments: Segment[] = [];
