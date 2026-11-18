@@ -1,16 +1,14 @@
 
 import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
   Activity, BookOpen, Braces, Check, Cpu, Database, Download,
-  FileCode2, FileText, Play, Plus, RefreshCw, Settings2,
-  ShieldCheck, SlidersHorizontal, Upload, Zap
+  Play, Plus, RefreshCw, ShieldCheck, SlidersHorizontal,
+  Upload, Zap
 } from 'lucide-react';
 import {
-  DEFAULT_WEIGHTS,
   TOKENS,
-  compileNxs,
-  downloadBytes,
   type Corpus,
   type TrainingConfig
 } from '../lib/nxs';
