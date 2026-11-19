@@ -182,7 +182,8 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
     sequence.slice(payloadStart, cursor),
     marker(0)
   );
-   }
+}
+   
    
 export function compileNxs(options: CompileOptions): Uint8Array {
   const total = Math.max(
