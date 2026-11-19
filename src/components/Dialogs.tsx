@@ -1,19 +1,20 @@
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  X, Search, Upload, Download, FilePlus2, Trash2,
-  Play, CheckCircle2, AlertCircle, Database
-} from 'lucide-react';
+import {X, Search, Upload, Download, FilePlus2, Trash2, Play, CheckCircle2, AlertCircle, Database} from 'lucide-react';
 import {
   buildRawSequence,
   compileNxs,
   downloadBytes,
   formatBytes,
+  downloadText,
+  inferModalityFromFilename,
+  parseNxs,
   type Corpus,
   type Modality,
   type TrainingConfig
 } from '../lib/nxs';
+import { getPythonScript } from '../lib/python';
 
 type NewCorpusDialogProps = {
   initialTab: 'file' | 'synthetic';
@@ -142,19 +143,32 @@ export function NewCorpusDialog({
 
     try {
       const source = new Uint8Array(await file.arrayBuffer());
-      const sequence = buildRawSequence('forge', source);
-      const data = new Uint8Array(sequence.length + 4);
-      new DataView(data.buffer).setUint32(0, sequence.length, true);
-      data.set(sequence, 4);
-
+      const isNxs = file.name.toLowerCase().endsWith('.nxs');
+      let data: Uint8Array;
+      let sequenceCount = 1;
+      let modalities: Modality[];
+      if (isNxs) {
+        const parsed = parseNxs(source);
+        if (parsed.length === 0) throw new Error('Le fichier NXS ne contient aucune séquence.');
+        data = source;
+        sequenceCount = parsed.length;
+        modalities = Array.from(new Set(parsed.flatMap(sequence => sequence.segments.map(segment => segment.type as Modality))));
+      } else {
+        const modality = inferModalityFromFilename(file.name, file.type);
+        const sequence = buildRawSequence(modality, source);
+        data = new Uint8Array(sequence.length + 4);
+        new DataView(data.buffer).setUint32(0, sequence.length, true);
+        data.set(sequence, 4);
+        modalities = [modality];
+      }
       onCreated({
         id: crypto.randomUUID(),
-        name: file.name.endsWith('.nxs') ? file.name : `${file.name}.nxs`,
+        name: isNxs ? file.name : file.name + '.nxs',
         createdAt: Date.now(),
         bytes: data.byteLength,
-        sequenceCount: 1,
+        sequenceCount,
         weights: initialWeights,
-        modalities: ['forge'],
+        modalities,
         status: 'ready',
         data
       });
@@ -324,7 +338,7 @@ export function ExportDialog({
   onClose,
   onExported
 }: ExportDialogProps) {
-  const [format, setFormat] = useState<'nxs' | 'json'>('nxs');
+  const [format, setFormat] = useState<'nxs' | 'json' | 'python'>('nxs');
 
   const exportData = () => {
     try {
@@ -336,6 +350,8 @@ export function ExportDialog({
           sequenceLength: config.block
         });
         downloadBytes(data, 'omniverse_export.nxs');
+      } else if (format === 'python') {
+        downloadText(getPythonScript(config), 'omnicore_model.py', 'text/x-python;charset=utf-8');
       } else {
         const data = JSON.stringify({
           format: 'NXS',
@@ -366,9 +382,10 @@ export function ExportDialog({
 
       <label className="block mb-3">
         <span className="block mb-2">Format</span>
-        <select className="w-full" value={format} onChange={event => setFormat(event.target.value as 'nxs' | 'json')}>
+        <select className="w-full" value={format} onChange={event => setFormat(event.target.value as 'nxs' | 'json' | 'python')}>
           <option value="nxs">Corpus NXS (.nxs)</option>
           <option value="json">Configuration JSON (.json)</option>
+          <option value="python">Architecture PyTorch (.py)</option>
         </select>
       </label>
 

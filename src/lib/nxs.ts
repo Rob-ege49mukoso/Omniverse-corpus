@@ -163,6 +163,19 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
   return concat(marker(254), escapePayload(text('SOURCE: Fichier local importé. Données inertes, sans exécution.')), marker(byte), escapePayload(payload), marker(0));
 }
 
+
+export function inferModalityFromFilename(filename: string, mimeType = ''): Modality {
+  const name = filename.toLowerCase();
+  const mime = mimeType.toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|bmp|tiff?|mp4|mov|webm|mkv|rgb)$/.test(name) || mime.startsWith('image/') || mime.startsWith('video/')) return 'vision';
+  if (/\.(json|jsonl|ndjson)$/.test(name) || mime === 'application/json' || mime.endsWith('+json')) return 'mcp';
+  if (/\.(py|js|jsx|ts|tsx|html|css|c|h|cpp|cc|rs|go|java|sh|sql|xml)$/.test(name)) return 'forge';
+  if (/\.(bin|elf|hex|pcap|dat)$/.test(name) || mime === 'application/octet-stream') return 'cyber';
+  if (/\.(txt|md|csv|log|rst)$/.test(name) || mime === 'text/markdown' || mime === 'text/plain') return 'think';
+  if (mime.startsWith('text/')) return 'forge';
+  return 'forge';
+}
+
    function limitSequence(
   sequence: Uint8Array,
   maxPayloadBytes: number
@@ -224,10 +237,8 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
 }
    
    export function compileNxs(options: CompileOptions): Uint8Array {
-  const total = Math.max(
-    4,
-    Math.min(4000, Math.round(options.multiplier * 4))
-  );
+  const requestedTotal = Number(options.multiplier) * 4;
+  const total = Number.isFinite(requestedTotal) ? Math.max(4, Math.min(4000, Math.round(requestedTotal))) : 4;
 
   const kinds: Modality[] = [
     'forge',
@@ -237,27 +248,22 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
     'think'
   ];
 
-  const sum =
-    options.weights.reduce((a, b) => a + b, 0) || 100;
-
-  const counts = options.weights.map(
-    weight => Math.floor(total * weight / sum)
-  );
-
+  const requestedWeights = kinds.map((_, index) => {
+    const weight = Number(options.weights?.[index]);
+    return Number.isFinite(weight) ? Math.max(0, weight) : 0;
+  });
+  const requestedSum = requestedWeights.reduce((sum, weight) => sum + weight, 0);
+  const normalizedWeights = requestedSum > 0 ? requestedWeights : DEFAULT_WEIGHTS;
+  const sum = normalizedWeights.reduce((a, b) => a + b, 0);
+  const exactCounts = normalizedWeights.map(weight => total * weight / sum);
+  const counts = exactCounts.map(Math.floor);
   let remainder = total - counts.reduce((a, b) => a + b, 0);
+  const remainderOrder = exactCounts.map((count, index) => ({ index, fraction: count - Math.floor(count) })).sort((a, b) => b.fraction - a.fraction);
+  for (let index = 0; remainder > 0; index++, remainder--) counts[remainderOrder[index % remainderOrder.length].index]++;
 
-  for (
-    let i = 0;
-    remainder > 0;
-    i = (i + 1) % counts.length, remainder--
-  ) {
-    counts[i]++;
-  }
 
-  const sequenceLength = Math.max(
-    1,
-    Math.floor(options.sequenceLength)
-  );
+  const requestedLength = Number(options.sequenceLength);
+  const sequenceLength = Number.isFinite(requestedLength) ? Math.max(1, Math.floor(requestedLength)) : 256;
 
   const sequences: Uint8Array[] = [];
 
@@ -314,6 +320,8 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
     data.byteOffset,
     data.byteLength
   );
+
+  if (data.length === 0) throw new Error('Le fichier NXS est vide.');
 
   const result: ParsedSequence[] = [];
   let offset = 0;

@@ -1,6 +1,6 @@
 
 
-import { Activity, ArrowRight, Database, Download, Layers3, Plus, Settings2, Trash2 } from 'lucide-react';
+import {Activity, ArrowRight, Database, Download, Layers3, Plus, Settings2, Trash2} from 'lucide-react';
 import type { Corpus } from '../lib/nxs';
 
 type DashboardPage =
