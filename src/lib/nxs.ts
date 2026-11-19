@@ -156,7 +156,7 @@ export function buildSequence(
     escapePayload(payload),
     marker(0)
   );
-                      }
+}
 
 export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Array {
   const byte = type === 'math' ? 1 : TOKENS.find(token => token.type === type)!.byte;
