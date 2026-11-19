@@ -70,54 +70,93 @@ const concat = (...arrays: Uint8Array[]) => {
   return result;
 };
 
- export function buildSequence(
+export function buildSequence(
   kind: Modality,
   variant = 0,
   corpusName = ''
 ): Uint8Array {
+  let payload: Uint8Array;
 
   if (kind === 'think') {
-    payload = text(variant % 2
-      ? 'OBJECTIF: Analyser la mémoire avant de modifier un fichier.\nJe vérifie les permissions, puis je calcule la taille du flux. Chaque octet est indépendant du tokeniseur.'
-      : 'OBJECTIF: Lire un fichier binaire inconnu.\nJe dois identifier ses premiers octets avant de choisir un outil. Je vérifie la signature, puis j’inspecte l’en-tête.');
+    payload = text(
+      variant % 2
+        ? 'OBJECTIF: Analyser la mémoire avant de modifier un fichier.\nJe vérifie les permissions, puis je calcule la taille du flux. Chaque octet est indépendant du tokeniseur.'
+        : 'OBJECTIF: Lire un fichier binaire inconnu.\nJe dois identifier ses premiers octets avant de choisir un outil. Je vérifie la signature, puis j’inspecte l’en-tête.'
+    );
   } else if (kind === 'forge') {
-    payload = text('# Objectif : lire les octets de contrôle sans exécuter le fichier.\ndef read_magic_bytes(filepath):\n    with open(filepath, "rb") as source:\n        return source.read(16).hex()\n\n# Analyse : FF 01, FF 02, FF 03, FF 04, FF 05.\n');
+    payload = text(
+      '# Objectif : lire les octets de contrôle sans exécuter le fichier.\ndef read_magic_bytes(filepath):\n    with open(filepath, "rb") as source:\n        return source.read(16).hex()\n\n# Analyse : FF 01, FF 02, FF 03, FF 04, FF 05.\n'
+    );
   } else if (kind === 'cyber') {
-    const elf = new Uint8Array([127,69,76,70,2,1,1,0,0,0,0,0,0,0,0,0]);
-    payload = concat(elf, text('\nSRC: void audit(char *text) { char buffer[16];\n     strncpy(buffer, text, sizeof(buffer) - 1);\n     buffer[sizeof(buffer) - 1] = 0; }\nPATCH: bornes vérifiées et terminaison NUL explicite.\n'));
+    const elf = new Uint8Array([
+      127, 69, 76, 70, 2, 1, 1, 0,
+      0, 0, 0, 0, 0, 0, 0, 0
+    ]);
+
+    payload = concat(
+      elf,
+      text(
+        '\nSRC: void audit(char *text) { char buffer[16];\n     strncpy(buffer, text, sizeof(buffer) - 1);\n     buffer[sizeof(buffer) - 1] = 0; }\nPATCH: bornes vérifiées et terminaison NUL explicite.\n'
+      )
+    );
   } else if (kind === 'mcp') {
-    payload = text(JSON.stringify({ jsonrpc: '2.0', id: variant + 1, method: 'tools/call', params: { name: 'filesystem.read_file', arguments: { path: 'system_logs.txt' } } }, null, 2));
+    payload = text(
+      JSON.stringify(
+        {
+          jsonrpc: '2.0',
+          id: variant + 1,
+          method: 'tools/call',
+          params: {
+            name: 'filesystem.read_file',
+            arguments: { path: 'system_logs.txt' }
+          }
+        },
+        null,
+        2
+      )
+    );
   } else if (kind === 'vision') {
     const header = new Uint8Array([3, 8, 8, 3]);
     const pixels = new Uint8Array(3 * 8 * 8 * 3);
     let offset = 0;
+
     for (let frame = 0; frame < 3; frame++) {
       for (let y = 0; y < 8; y++) {
         for (let x = 0; x < 8; x++) {
-          pixels[offset++] = Math.round((Math.sin((x + frame + variant) * 0.7) + 1) * 127);
-          pixels[offset++] = Math.round((Math.cos((y + frame) * 0.7) + 1) * 127);
-          pixels[offset++] = (x * y * (frame + variant)) % 256;
+          pixels[offset++] = Math.round(
+            (Math.sin((x + frame + variant) * 0.7) + 1) * 127
+          );
+          pixels[offset++] = Math.round(
+            (Math.cos((y + frame) * 0.7) + 1) * 127
+          );
+          pixels[offset++] =
+            (x * y * (frame + variant)) % 256;
         }
       }
     }
+
     payload = concat(header, pixels);
   } else {
-    payload = text('THEOREM borne_addition (n m : Nat) :\n  n + m = m + n := by\n  rw [Nat.add_comm]\n\nPREUVE: la commutativité est réduite à Nat.add_comm.');
+    payload = text(
+      'THEOREM borne_addition (n m : Nat) :\n  n + m = m + n := by\n  rw [Nat.add_comm]\n\nPREUVE: la commutativité est réduite à Nat.add_comm.'
+    );
   }
 
   const type = kind === 'math' ? 'think' : kind;
   const byte = TOKENS.find(token => token.type === type)!.byte;
-  const metadata =
-  'OBJECTIF: Construire un corpus multimodal cohérent.\n' +
-  (corpusName ? `CORPUS: ${corpusName}\n` : '');
 
-return concat(
-  marker(254),
-  escapePayload(text(metadata)),
-  marker(byte),
-  escapePayload(payload),
-  marker(0)
-);
+  const metadata =
+    'OBJECTIF: Construire un corpus multimodal cohérent.\n' +
+    (corpusName ? `CORPUS: ${corpusName}\n` : '');
+
+  return concat(
+    marker(254),
+    escapePayload(text(metadata)),
+    marker(byte),
+    escapePayload(payload),
+    marker(0)
+  );
+                      }
 
 export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Array {
   const byte = type === 'math' ? 1 : TOKENS.find(token => token.type === type)!.byte;
