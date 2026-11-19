@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import {Activity, BookOpen, Braces, Check, Cpu, Database, Download, Play, Plus, RefreshCw, ShieldCheck, SlidersHorizontal, Upload, Zap} from 'lucide-react';
+import {Activity, BookOpen, Braces, Check, Cpu, Database, Download, Plus, RefreshCw, ShieldCheck, SlidersHorizontal, Upload, Zap} from 'lucide-react';
 import {
   TOKENS,
   type Corpus,
