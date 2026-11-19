@@ -178,199 +178,104 @@ export function PipelinePage({
   );
 }
 
-/* SIMULATION D'ENTRAÎNEMENT */
+/* REAL TRAINING WORKFLOW */
 
-type TrainingRun = {
-  status: 'idle' | 'running' | 'paused' | 'completed';
-  epoch: number;
-  progress: number;
-  config: TrainingConfig;
-};
-
-type TrainingSimulation = {
-  run: TrainingRun;
-  start: () => void;
-  pause: () => void;
-  reset: () => void;
-  clearHistory: () => void;
-};
-
-export function useTrainingSimulation(): TrainingSimulation {
-  const [run, setRun] = useState<TrainingRun>({
-    status: 'idle',
-    epoch: 0,
-    progress: 0,
-    config: { ...({ model: 'OmniCore Compact', dModel: 256, heads: 8, layers: 2, batchSize: 8, learningRate: 0.0003, epochs: 5, block: 256 }) }
-  });
-
-  useEffect(() => {
-    if (run.status !== 'running') return;
-
-    const timer = window.setInterval(() => {
-      setRun(previous => {
-        if (previous.status !== 'running') return previous;
-
-        const progress = previous.progress + 5;
-        if (progress >= 100) {
-          const epoch = previous.epoch + 1;
-          return {
-            ...previous,
-            epoch,
-            progress: 0,
-            status: epoch >= previous.config.epochs ? 'completed' : 'running'
-          };
-        }
-
-        return { ...previous, progress };
-      });
-    }, 500);
-
-    return () => window.clearInterval(timer);
-  }, [run.status]);
-
-  const start = () => setRun(previous => ({
-    ...previous,
-    status: previous.status === 'completed' ? 'running' : 'running'
-  }));
-
-  const pause = () => setRun(previous => ({ ...previous, status: 'paused' }));
-
-  const reset = () => setRun(previous => ({
-    ...previous,
-    status: 'idle',
-    epoch: 0,
-    progress: 0
-  }));
-
-  const clearHistory = () => reset();
-
-  return { run, start, pause, reset, clearHistory };
-}
+import type { TrainingManifest, TrainingMode, TrainingPlatform } from '../lib/training';
 
 export function TrainingPage({
-  initialCorpusId,
-  config,
-  setConfig,
-  corpora,
-  simulation,
-  onExport,
-  onCompile,
-  onSelect
+  initialCorpusId, config, setConfig, corpora, trainingResult,
+  onDownloadNotebook, onExportCorpus, onImportResult, onCompile, onSelect
 }: {
   initialCorpusId?: string;
   config: TrainingConfig;
   setConfig: Dispatch<SetStateAction<TrainingConfig>>;
   corpora: Corpus[];
-  simulation: TrainingSimulation;
-  onExport: () => void;
+  trainingResult: TrainingManifest | null;
+  onDownloadNotebook: (mode: TrainingMode, platform: TrainingPlatform, modelName: string) => void;
+  onExportCorpus: (corpus: Corpus) => void;
+  onImportResult: (file: File) => void;
   onCompile: () => void;
   onSelect: (corpus: Corpus) => void;
 }) {
-  const selected = corpora.find(item => item.id === initialCorpusId);
-  const { run } = simulation;
-
-  const update = (key: keyof TrainingConfig, value: number | string) => {
-    setConfig(previous => ({ ...previous, [key]: value }));
-  };
-
+  const [mode,setMode]=useState<TrainingMode>('B');
+  const [platform,setPlatform]=useState<TrainingPlatform>('colab');
+  const [pretrainedModel,setPretrainedModel]=useState('Qwen/Qwen2.5-0.5B');
+  const selected=corpora.find(item=>item.id===initialCorpusId);
+  const canExport=Boolean(selected && !selected.demo && selected.data && selected.data.length>0);
+  const update=(key:keyof TrainingConfig,value:number|string)=>setConfig(previous=>({...previous,[key]:value}));
   return (
     <div className="space-y-5">
       <section className={panel}>
-        <PageTitle
-          title="OmniCore Engine"
-          description="Configuration et simulation de l'entraînement."
-        />
-
-        <label className="block mb-4">
-          <span className="block text-sm mb-2">Corpus d'entraînement</span>
-          <select
-            className="w-full"
-            value={selected?.id ?? ''}
-            onChange={event => {
-              const corpus = corpora.find(item => item.id === event.target.value);
-              if (corpus) onSelect(corpus);
-            }}
-          >
+        <PageTitle title="OmniCore — entraînement réel" description="Préparez un entraînement PyTorch ou Hugging Face dans un runtime gratuit externe."/>
+        <label className="block mb-4 text-sm">Corpus d'entraînement
+          <select className="w-full mt-2" value={selected?.id??''} onChange={event=>{
+            const corpus=corpora.find(item=>item.id===event.target.value); if(corpus) onSelect(corpus);
+          }}>
             <option value="">Choisir un corpus</option>
-            {corpora.map(corpus => (
-              <option key={corpus.id} value={corpus.id}>{corpus.name}</option>
-            ))}
+            {corpora.map(corpus=><option key={corpus.id} value={corpus.id}>{corpus.name}{corpus.demo?' — démonstration non entraînable':''}</option>)}
           </select>
         </label>
-
+        {selected?.demo && <p className="text-sm text-amber-400 mb-3">Ce corpus est une démonstration. Il ne peut pas être exporté pour l’entraînement.</p>}
+        {selected && !selected.demo && !selected.data && <p className="text-sm text-amber-400 mb-3">Les octets de ce corpus ne sont pas disponibles. Réimportez le fichier NXS original.</p>}
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            Modèle
-            <select className="w-full mt-2" value={config.model} onChange={event => update('model', event.target.value)}>
-              <option>OmniCore Compact</option>
-              <option>OmniCore Base</option>
-              <option>OmniCore Experimental</option>
+          <label className="block text-sm">Stratégie d'entraînement
+            <select className="w-full mt-2" value={mode} onChange={event=>setMode(event.target.value as TrainingMode)}>
+              <option value="A">A — Fine-tuning d’un modèle préentraîné</option>
+              <option value="B">B — Architecture OmniCore personnalisée</option>
+              <option value="C">C — Transformer from scratch</option>
             </select>
           </label>
-
+          <label className="block text-sm">Environnement gratuit
+            <select className="w-full mt-2" value={platform} onChange={event=>setPlatform(event.target.value as TrainingPlatform)}>
+              <option value="colab">Google Colab</option><option value="kaggle">Kaggle Notebooks</option>
+            </select>
+          </label>
+          {mode==='A' && <label className="block text-sm sm:col-span-2">Modèle préentraîné
+            <input className="w-full mt-2" value={pretrainedModel} onChange={event=>setPretrainedModel(event.target.value)}/>
+            <small className="opacity-70">Valeur initiale : Qwen/Qwen2.5-0.5B. Le runtime doit pouvoir télécharger le modèle.</small>
+          </label>}
           {([
-            ['dModel', 'Dimension du modèle'],
-            ['heads', 'Nombre de têtes'],
-            ['layers', 'Nombre de couches'],
-            ['batchSize', 'Taille du batch'],
-            ['epochs', 'Nombre d’epochs'],
-            ['block', 'Taille des blocs']
-          ] as [keyof TrainingConfig, string][]).map(([key, label]) => (
-            <label className="block text-sm" key={key}>
-              {label}
-              <input
-                className="w-full mt-2"
-                type="number"
-                min="1"
-                value={config[key]}
-                onChange={event => update(key, Number(event.target.value))}
-              />
-            </label>
-          ))}
-
-          <label className="block text-sm">
-            Learning rate
-            <input
-              className="w-full mt-2"
-              type="number"
-              step="0.0001"
-              min="0.000001"
-              value={config.learningRate}
-              onChange={event => update('learningRate', Number(event.target.value))}
-            />
+            ['dModel','Dimension du modèle'],['heads','Nombre de têtes'],['layers','Nombre de couches'],
+            ['batchSize','Taille du batch'],['epochs','Nombre d’epochs'],['block','Taille des blocs']
+          ] as [keyof TrainingConfig,string][]).map(([key,label])=><label className="block text-sm" key={key}>{label}
+            <input className="w-full mt-2" type="number" min="1" value={config[key]} onChange={event=>update(key,Number(event.target.value))}/>
+          </label>)}
+          <label className="block text-sm">Learning rate
+            <input className="w-full mt-2" type="number" step="0.0001" min="0.000001" value={config.learningRate} onChange={event=>update('learningRate',Number(event.target.value))}/>
           </label>
         </div>
-
         <div className="flex flex-wrap gap-2 mt-5">
-          <button className="button button-primary" onClick={simulation.start}>
-            <Play size={15} /> Démarrer
-          </button>
-          <button className={button} onClick={simulation.pause}>Pause</button>
-          <button className={button} onClick={simulation.reset}>
-            <RefreshCw size={15} /> Réinitialiser
-          </button>
-          <button className={button} onClick={onExport}>
-            <Download size={15} /> Exporter le moteur
-          </button>
-          <button className={button} onClick={onCompile}>
-            <Plus size={15} /> Nouveau corpus
-          </button>
+          <button className="button button-outline" disabled={!canExport} onClick={()=>selected&&onExportCorpus(selected)}><Download size={15}/> Exporter le corpus NXS</button>
+          <button className="button button-primary" disabled={mode==='A'&&!pretrainedModel.trim()} onClick={()=>onDownloadNotebook(mode,platform,pretrainedModel.trim())}><Download size={15}/> Générer le notebook {platform==='colab'?'Colab':'Kaggle'}</button>
+          <button className={button} onClick={onCompile}><Plus size={15}/> Nouveau corpus</button>
         </div>
       </section>
-
       <section className={panel}>
-        <PageTitle title="État de la simulation" description="Suivi de la progression locale." />
-        <div className="flex justify-between gap-3 text-sm">
-          <span>État : <strong>{run.status}</strong></span>
-          <span>Epoch {run.epoch}/{run.config.epochs}</span>
-        </div>
-        <div className="progress-track mt-3">
-          <span style={{ width: `${run.progress}%` }} />
-        </div>
-        <p className="text-sm opacity-70 mt-2">{run.progress.toFixed(0)}% de l’epoch en cours</p>
-        <p className="text-xs opacity-60 mt-3">
-          Simulation d’interface uniquement : aucun modèle neuronal réel n’est entraîné.
-        </p>
+        <PageTitle title="Exécution et résultats" description="Le calcul s’effectue dans Colab ou Kaggle, pas dans le navigateur."/>
+        <p className="text-sm opacity-80 mb-3">1. Exportez un corpus réel. 2. Générez le notebook. 3. Exécutez les cellules dans l’environnement choisi. 4. Téléchargez manifest.json puis importez-le ici.</p>
+        <label className="button button-outline inline-flex cursor-pointer"><Upload size={15}/> Importer manifest.json
+          <input className="sr-only" type="file" accept=".json,application/json" onChange={event=>{
+            const file=event.target.files?.[0]; if(file) onImportResult(file); event.currentTarget.value='';
+          }}/>
+        </label>
+        {!trainingResult ? <p className="text-sm opacity-60 mt-4">Aucun résultat réel importé. La progression ne sera affichée qu’après réception d’un manifeste terminé.</p> :
+          <div className="mt-4 space-y-2 text-sm">
+            <div className="flex flex-wrap justify-between gap-2"><strong>Entraînement terminé · Mode {trainingResult.mode}</strong><span>{trainingResult.device}</span></div>
+            <p>Moteur : {trainingResult.engine}</p><p>Corpus : {trainingResult.datasetName} · {trainingResult.sequenceCount.toLocaleString('fr-FR')} séquences</p>
+            <p>Modèle : {trainingResult.modelName}</p><p>Terminé : {new Date(trainingResult.completedAt).toLocaleString('fr-FR')}</p>
+            {Object.entries(trainingResult.metrics).map(([key,value])=><p key={key}>{key} : <strong>{typeof value==='number'?value.toLocaleString('fr-FR',{maximumFractionDigits:5}):String(value)}</strong></p>)}
+            {trainingResult.validationFallback&&<p className="text-amber-400">Corpus trop petit pour une validation indépendante : les données d’entraînement sont réutilisées.</p>}
+            <p className="opacity-60">Artefact dans le runtime : {trainingResult.artifact}</p>
+          </div>}
+      </section>
+      <section className={panel}>
+        <PageTitle title="Limites du mode gratuit" description="Les ressources de calcul gratuites ne sont pas garanties."/>
+        <ul className="list-disc pl-5 space-y-1 text-sm opacity-80">
+          <li>Disponibilité GPU, durée des sessions et quotas dépendent de la plateforme.</li>
+          <li>Les checkpoints sont enregistrés pendant l’entraînement, mais la reprise doit être faite dans le runtime.</li>
+          <li>Le mode A adapte un modèle préentraîné ; B/C initialisent et entraînent leurs propres poids.</li>
+          <li>Les octets d’images dans B/C ne remplacent pas un encodeur visuel spécialisé.</li>
+        </ul>
       </section>
     </div>
   );
