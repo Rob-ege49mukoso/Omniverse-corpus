@@ -83,8 +83,14 @@ export async function readTrainingManifest(file: File): Promise<TrainingManifest
   const data=value as Record<string,unknown>;
   if (data.schemaVersion!==1 || data.status!=='completed' ||
       !['A','B','C'].includes(String(data.mode)) || typeof data.engine!=='string' ||
-      typeof data.datasetName!=='string' || typeof data.datasetSha256!=='string' ||
-      typeof data.completedAt!=='string' || typeof data.metrics!=='object' || data.metrics===null) {
+      typeof data.modelName!=='string' || typeof data.datasetName!=='string' ||
+      typeof data.datasetSha256!=='string' || !/^[a-f0-9]{64}$/i.test(data.datasetSha256) ||
+      typeof data.sequenceCount!=='number' || !Number.isFinite(data.sequenceCount) ||
+      typeof data.trainSampleCount!=='number' || typeof data.validationSampleCount!=='number' ||
+      typeof data.validationFallback!=='boolean' || typeof data.artifact!=='string' ||
+      typeof data.device!=='string' || typeof data.completedAt!=='string' ||
+      !Number.isFinite(Date.parse(data.completedAt)) ||
+      typeof data.metrics!=='object' || data.metrics===null || Array.isArray(data.metrics)) {
     throw new Error('Ce fichier ne correspond pas à un manifeste Omniverse v1 terminé.');
   }
   return data as unknown as TrainingManifest;

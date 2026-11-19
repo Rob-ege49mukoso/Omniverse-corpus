@@ -98,8 +98,10 @@ def train_a(args,sequences,out):
         def __init__(self,records):
             self.rows=[]
             for text in records:
-                ids=tokenizer(text,add_special_tokens=True,truncation=True,max_length=args.block_size)["input_ids"]
-                if len(ids)>=2: self.rows.append({"input_ids":ids})
+                ids=tokenizer(text,add_special_tokens=True,truncation=False)["input_ids"]
+                for start in range(0,max(1,len(ids)-1),args.block_size):
+                    chunk=ids[start:start+args.block_size]
+                    if len(chunk)>=2: self.rows.append({"input_ids":chunk})
             if not self.rows: raise ValueError("Aucun bloc de texte produit par le tokenizer.")
         def __len__(self): return len(self.rows)
         def __getitem__(self,i): return self.rows[i]

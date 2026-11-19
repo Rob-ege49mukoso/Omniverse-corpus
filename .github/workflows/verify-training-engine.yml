@@ -1,0 +1,30 @@
+name: Verify training engine and web app
+
+on:
+  push:
+    branches:
+      - feature/real-training-engine
+  pull_request:
+    branches:
+      - fix/omniverse-corpus
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install web dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck, tests and production build
+        run: npm run check
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test NXS parser
+        run: python -m unittest discover -s training/tests -v

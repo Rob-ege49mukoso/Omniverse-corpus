@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Box, Braces, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CircleHelp, Command, Cpu, Database, Download, HardDrive, Layers3, Menu, Plus, Search, Settings2, Workflow, X, type LucideIcon} from 'lucide-react';
+import {Activity, ArrowUpRight, Bell, BookOpen, Box, Braces, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CircleHelp, Command, Cpu, Database, Download, HardDrive, Layers3, Menu, Plus, Search, Settings2, Workflow, X, type LucideIcon} from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { CorporaPage, DocsPage, ModelsPage, PipelinePage, ProtocolsPage, SettingsPage, TrainingPage, type Page } from './components/Pages';
 import { ConfirmDialog, CorpusDialog, ExportDialog, NewCorpusDialog, SearchDialog } from './components/Dialogs';
@@ -75,7 +75,19 @@ export default function App() {
     setPage(next); window.location.hash = next; setMobileNav(false); setWorkspaceMenu(false); setNotifications(false); setProfileMenu(false); setDialog(null); mainRef.current?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 });
   }, []);
   const handleCreated = (corpus: Corpus) => { setCorpora(previous => [corpus, ...previous]); setDialog({ type: 'corpus', corpus }); setHasNotification(true); setEvents(previous => [corpus.name + ' compilé · ' + corpus.sequenceCount + ' séquences', ...previous].slice(0, 6)); void saveCorpus(corpus).then(() => notify('Corpus compilé et sauvegardé localement.')).catch(() => notify('Corpus créé pour cette session, mais le stockage local a échoué. Exportez-le pour le conserver.')); };
-  const downloadCorpus = (corpus: Corpus) => { downloadBytes(corpus.data || compileNxs({ name: corpus.name, multiplier: 25, weights: corpus.weights, sequenceLength: config.block }), corpus.name); notify(corpus.demo ? 'Aperçu synthétique téléchargé : 100 séquences réelles.' : 'Votre corpus .nxs a été téléchargé.'); };
+  const downloadCorpus = (corpus: Corpus) => {
+    if (corpus.demo) {
+      downloadBytes(compileNxs({ name: corpus.name, multiplier: 25, weights: corpus.weights, sequenceLength: config.block }), corpus.name);
+      notify('Aperçu synthétique téléchargé. Ces données de démonstration ne sont pas entraînables.');
+      return;
+    }
+    if (!corpus.data || corpus.data.length === 0) {
+      notify('Les octets originaux de ce corpus ne sont pas disponibles. Réimportez le fichier NXS.');
+      return;
+    }
+    downloadBytes(corpus.data, corpus.name);
+    notify('Votre corpus .nxs a été téléchargé.');
+  };
   const removeCorpus = (corpus: Corpus) => setDialog({ type: 'confirm', title: 'Supprimer ce corpus ?', description: `« ${corpus.name} » sera supprimé de ce workspace. Les fichiers déjà téléchargés ne seront pas affectés.`, action: 'Supprimer le corpus', confirm: () => { setCorpora(previous => previous.filter(item => item.id !== corpus.id)); if (!corpus.demo) deleteCorpus(corpus.id).catch(() => notify('Supprimé pour cette session. Le stockage local n’a pas pu être mis à jour.')); setDialog(null); notify('Corpus supprimé du workspace.'); } });
   const exportEngine = () => setDialog({ type: 'export' });
   const downloadNotebook = async (mode: TrainingMode, platform: TrainingPlatform, modelName: string) => {

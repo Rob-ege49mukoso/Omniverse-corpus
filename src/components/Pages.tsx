@@ -263,7 +263,7 @@ export function TrainingPage({
             <div className="flex flex-wrap justify-between gap-2"><strong>Entraînement terminé · Mode {trainingResult.mode}</strong><span>{trainingResult.device}</span></div>
             <p>Moteur : {trainingResult.engine}</p><p>Corpus : {trainingResult.datasetName} · {trainingResult.sequenceCount.toLocaleString('fr-FR')} séquences</p>
             <p>Modèle : {trainingResult.modelName}</p><p>Terminé : {new Date(trainingResult.completedAt).toLocaleString('fr-FR')}</p>
-            {Object.entries(trainingResult.metrics).map(([key,value])=><p key={key}>{key} : <strong>{typeof value==='number'?value.toLocaleString('fr-FR',{maximumFractionDigits:5}):String(value)}</strong></p>)}
+            {Object.entries(trainingResult.metrics).map(([key,value])=><p key={key}>{key} : <strong>{typeof value==='number'?value.toLocaleString('fr-FR',{maximumFractionDigits:5}):typeof value==='object'?JSON.stringify(value):String(value)}</strong></p>)}
             {trainingResult.validationFallback&&<p className="text-amber-400">Corpus trop petit pour une validation indépendante : les données d’entraînement sont réutilisées.</p>}
             <p className="opacity-60">Artefact dans le runtime : {trainingResult.artifact}</p>
           </div>}
