@@ -267,7 +267,6 @@ export function compileNxs(options: CompileOptions): Uint8Array {
   }
 
   return output;
-      }
   
    export function parseNxs(data: Uint8Array): ParsedSequence[] {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -352,7 +351,8 @@ export function compileNxs(options: CompileOptions): Uint8Array {
   }
 
   return result;
-
+      }
+     
   function unescape(data: Uint8Array): Uint8Array {
   const result = new Uint8Array(data.length);
   let offset = 0;
