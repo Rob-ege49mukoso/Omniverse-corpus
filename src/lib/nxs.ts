@@ -223,8 +223,7 @@ export function buildRawSequence(type: Modality, payload: Uint8Array): Uint8Arra
   );
 }
    
-   
-export function compileNxs(options: CompileOptions): Uint8Array {
+   export function compileNxs(options: CompileOptions): Uint8Array {
   const total = Math.max(
     4,
     Math.min(4000, Math.round(options.multiplier * 4))
@@ -307,9 +306,15 @@ export function compileNxs(options: CompileOptions): Uint8Array {
   }
 
   return output;
-  
-   export function parseNxs(data: Uint8Array): ParsedSequence[] {
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+         }
+
+  export function parseNxs(data: Uint8Array): ParsedSequence[] {
+  const view = new DataView(
+    data.buffer,
+    data.byteOffset,
+    data.byteLength
+  );
+
   const result: ParsedSequence[] = [];
   let offset = 0;
 
@@ -391,9 +396,9 @@ export function compileNxs(options: CompileOptions): Uint8Array {
   }
 
   return result;
-      }
-     
-  function unescape(data: Uint8Array): Uint8Array {
+    }
+      
+      function unescape(data: Uint8Array): Uint8Array {
   const result = new Uint8Array(data.length);
   let offset = 0;
 
